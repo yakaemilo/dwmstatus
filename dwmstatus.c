@@ -118,7 +118,17 @@ readfile(char *base, char *file)
 char *
 getbattery(char *base)
 {
-	return smprintf("test");
+	char *co, *nl;
+
+	co = readfile(base, "capacity");
+	if (co == NULL)
+		return smprintf("");
+
+	nl = strchr(co, '\n');
+	if (nl)
+		*nl = '\0';
+	
+	return smprintf("%s%%", co);
 }
 
 char *
