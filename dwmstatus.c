@@ -17,9 +17,6 @@
 
 #include <X11/Xlib.h>
 
-char *tzargentina = "America/Buenos_Aires";
-char *tzutc = "UTC";
-char *tzberlin = "Europe/Berlin";
 
 static Display *dpy;
 
@@ -47,21 +44,14 @@ smprintf(char *fmt, ...)
 	return ret;
 }
 
-void
-settz(char *tzname)
-{
-	setenv("TZ", tzname, 1);
-}
-
 char *
-mktimes(char *fmt, char *tzname)
+gettime(char *fmt)
 {
 	char buf[129];
 	time_t tim;
 	struct tm *timtm;
 
-	settz(tzname);
-	tim = time(NULL);
+	time(&tim);
 	timtm = localtime(&tim);
 	if (timtm == NULL)
 		return smprintf("");
@@ -79,17 +69,6 @@ setstatus(char *str)
 {
 	XStoreName(dpy, DefaultRootWindow(dpy), str);
 	XSync(dpy, False);
-}
-
-char *
-loadavg(void)
-{
-	double avgs[3];
-
-	if (getloadavg(avgs, 3) < 0)
-		return smprintf("");
-
-	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
 }
 
 char *
@@ -119,6 +98,7 @@ char *
 getbattery(char *base)
 {
 	char *co, *nl;
+	char *ret;
 
 	co = readfile(base, "capacity");
 	if (co == NULL)
@@ -128,18 +108,9 @@ getbattery(char *base)
 	if (nl)
 		*nl = '\0';
 	
-	return smprintf("%s%%", co);
-}
-
-char *
-gettemperature(char *base, char *sensor)
-{
-	char *co;
-
-	co = readfile(base, sensor);
-	if (co == NULL)
-		return smprintf("");
-	return smprintf("%02.0f°C", atof(co) / 1000);
+	ret = smprintf("%s%%", co);
+	free(co);
+	return ret;
 }
 
 char *
@@ -166,17 +137,9 @@ execscript(char *cmd)
 int
 main(void)
 {
-	char *status;
-	char *avgs;
+	char *status; 
 	char *bat;
-	char *tmar;
-	char *tmutc;
-	char *tmbln;
-	char *t0;
-	char *t1;
-	char *kbmap;
-	char *surfs;
-	char *memes;
+	char *tm;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
@@ -184,32 +147,15 @@ main(void)
 	}
 
 	for (;;sleep(30)) {
-		avgs = loadavg();
-		bat = getbattery("/sys/class/power_supply/BAT0");
-		tmar = mktimes("%H:%M", tzargentina);
-		tmutc = mktimes("%H:%M", tzutc);
-		tmbln = mktimes("KW %W %a %d %b %H:%M %Z %Y", tzberlin);
-		kbmap = execscript("setxkbmap -query | grep layout | cut -d':' -f 2- | tr -d ' '");
-		surfs = execscript("surf-status");
-		memes = execscript("meme-status");
-		t0 = gettemperature("/sys/devices/virtual/thermal/thermal_zone0", "temp");
-		t1 = gettemperature("/sys/devices/virtual/thermal/thermal_zone1", "temp");
+		bat = getbattery("/sys/class/power_supply/bat0");
+		tm = gettime("%H:%M");
 
-		status = smprintf("B:%s",
-				bat);
+		status = smprintf("B:%s   %s",
+				bat, tm);
 		setstatus(status);
 
-		free(surfs);
-		free(memes);
-		free(kbmap);
-		free(t0);
-		free(t1);
-		free(avgs);
 		free(bat);
-		free(tmar);
-		free(tmutc);
-		free(tmbln);
-		free(status);
+		free(tm);
 	}
 
 	XCloseDisplay(dpy);
